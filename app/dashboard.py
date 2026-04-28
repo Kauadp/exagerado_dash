@@ -386,4 +386,4 @@ else:
 
     df_loja = df_completo[df_completo["id_loja"] == loja_id]
 
-    render_secao_loja(df_loja, nome_loja, loja_id)
+    render_secao_loja(df_loja, nome_loja, loja_id, map_lojas)

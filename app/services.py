@@ -4,6 +4,7 @@ import streamlit as st
 from html2image import Html2Image
 from config import DATABASE_URL
 from exagerado_theme import section_header, kpi_card, chart_card, table_card
+import requests
 
 def html_para_png(html_string, nome_arquivo="relatorio.png"):
     hti = Html2Image(
@@ -18,7 +19,7 @@ def html_para_png(html_string, nome_arquivo="relatorio.png"):
 
     return nome_arquivo
 
-def render_secao_loja(df_loja, nome_loja, loja_id):
+def render_secao_loja(df_loja, nome_loja, loja_id, map_lojas):
 
     st.title(f"🏪 {nome_loja}")
     st.markdown("---")
@@ -222,9 +223,29 @@ def render_secao_loja(df_loja, nome_loja, loja_id):
 
         st.success("Imagem gerada!")
 
+        try:
+            url_api = st.secrets["api"]["URL_API"]
+            webhook_token = st.secrets["api"]["WEBHOOK_TOKEN"]
+            id_da_loja = loja_id
+            with open(arquivo, "rb") as f:
+                files = {"file": (arquivo, f, "image/png")}
+                data = {"loja_id": id_da_loja}
+                params = {"token": webhook_token}
+
+                response = requests.post(url_api, params=params, data=data, files=files)
+
+            if response.status_code == 200:
+                st.info("🚀 Sinal enviado para o backend!")
+            else:
+                st.error(f"⚠️ Erro ao sinalizar backend: {response.status_code}")
+                
+        except Exception as e:
+            st.error(f"💥 Falha na comunicação local: {e}")
+
+        # 3. OPÇÃO DE BAIXAR (Mantém como redundância se você quiser guardar)
         with open(arquivo, "rb") as f:
             st.download_button(
-                label="⬇️ Baixar imagem",
+                label="⬇️ Baixar imagem (Cópia Local)",
                 data=f,
                 file_name=arquivo,
                 mime="image/png"
