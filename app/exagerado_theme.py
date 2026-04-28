@@ -536,8 +536,9 @@ def inject_theme():
 # =============================================
 # =============================================
 
-def chart_card(title: str, fig, height: int = 720):
-    """Renderiza um card visual completo para um gráfico Plotly."""
+def chart_card(title: str, fig, height: int = 720, return_html: bool = False):
+    """Renderiza ou retorna HTML de um card de gráfico Plotly."""
+
     fig.update_layout(
         autosize=True,
         height=560,
@@ -545,27 +546,35 @@ def chart_card(title: str, fig, height: int = 720):
         paper_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=0, b=20, l=0, r=0),
     )
+
     chart_html = fig.to_html(
         full_html=False,
         include_plotlyjs='cdn',
         config={'displayModeBar': False, 'responsive': True},
     )
-    html(f"""
+
+    html_str = f"""
     <div style="background:#ffffff; border:1px solid rgba(26,26,26,0.12); border-radius:12px; padding:18px 20px 16px; margin-bottom:16px;">
         <div style="font-size:13px; font-weight:600; color:#6B6963; margin-bottom:14px;">{title}</div>
         <div style="width:100%; min-height:560px;">
             {chart_html}
         </div>
     </div>
-    """, height=height, scrolling=True)
-
-def kpi_card(label, value, delta=None, delta_type="neutral", color="default"):
     """
-    Renderiza um card de KPI com estilo Exagerado.
+
+    if return_html:
+        return html_str
+    else:
+        html(html_str, height=height, scrolling=True)
+
+def kpi_card(label, value, delta=None, delta_type="neutral", color="default", return_html: bool = False):
+    """
+    Renderiza ou retorna HTML de um card de KPI.
 
     color: "default" | "purple" | "green" | "red" | "amber"
     delta_type: "positive" | "negative" | "neutral"
     """
+
     colors = {
         "purple": ("var(--ex-purple-light)", "var(--ex-purple)"),
         "green":  ("var(--ex-green-light)",  "var(--ex-green)"),
@@ -573,6 +582,7 @@ def kpi_card(label, value, delta=None, delta_type="neutral", color="default"):
         "amber":  ("var(--ex-amber-light)",  "var(--ex-amber)"),
         "default":("#FAFAF8",                "rgba(26,26,26,0.1)"),
     }
+
     bg, border = colors.get(color, colors["default"])
 
     delta_colors = {
@@ -580,11 +590,15 @@ def kpi_card(label, value, delta=None, delta_type="neutral", color="default"):
         "negative": "var(--ex-red)",
         "neutral":  "var(--ex-gray-dark)",
     }
+
     delta_color = delta_colors.get(delta_type, "var(--ex-gray-dark)")
 
-    delta_html = f'<div style="font-size:12px;font-weight:500;color:{delta_color};margin-top:6px">{delta}</div>' if delta else ""
+    delta_html = (
+        f'<div style="font-size:12px;font-weight:500;color:{delta_color};margin-top:6px">{delta}</div>'
+        if delta else ""
+    )
 
-    st.markdown(f"""
+    html_str = f"""
     <div style="
         background:{bg};
         border:1px solid {border};
@@ -596,41 +610,12 @@ def kpi_card(label, value, delta=None, delta_type="neutral", color="default"):
         <div style="font-family:'DM Serif Display',serif;font-size:28px;font-style:italic;color:var(--ex-black);line-height:1.1">{value}</div>
         {delta_html}
     </div>
-    """, unsafe_allow_html=True)
+    """
 
-
-def resumo_estrategico(items):
-    """Renderiza o card de Resumo Estratégico com um estilo próximo ao mockup."""
-    dot_colors = {"ok": "#4CAF87", "warn": "#E8933A", "alert": "#E05A5A"}
-
-    item_html = ""
-    for item in items:
-        dot = dot_colors.get(item.get('type', 'warn'), '#888')
-        value = item.get('value', '')
-        value_html = (
-            f'<span style="font-size:13px;color:rgba(255,255,255,0.72);font-weight:500;margin-left:8px">{value}</span>'
-            if value not in (None, '')
-            else ''
-        )
-        item_html += f"""
-        <div style="display:flex;align-items:flex-start;gap:10px;font-size:13px;color:rgba(255,255,255,0.8);line-height:1.6;margin-bottom:12px">
-            <span style="width:7px;height:7px;border-radius:50%;background:{dot};flex-shrink:0;margin-top:6px;display:inline-block"></span>
-            <div>
-                <div style="font-size:14px;color:#FAFAF8;font-weight:600;margin-bottom:4px">{item.get('label', '')}{value_html}</div>
-                <div>{item.get('delta', item.get('text', ''))}</div>
-            </div>
-        </div>
-        """
-
-    total_height = 180 + len(items) * 70
-    html(f"""
-    <div style="background:#1A1A1A; border-radius:12px; padding:20px 24px; margin-top:12px; color:#FAFAF8; border:1px solid rgba(255,255,255,0.08);">
-        <div style="font-family:'DM Serif Display',serif; font-size:17px; font-style:italic; color:#FAFAF8; margin-bottom:16px;">
-            Resumo Estratégico
-        </div>
-        {item_html}
-    </div>
-    """, height=total_height, scrolling=False)
+    if return_html:
+        return html_str
+    else:
+        st.markdown(html_str, unsafe_allow_html=True)
 
 
 def section_header(title, pill_text=None):
@@ -658,11 +643,20 @@ def sidebar_logo():
     <hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0 0 16px">
     """, unsafe_allow_html=True)
 
-def _df_to_html_rows(df: pd.DataFrame, col_labels: dict = None) -> str:
-    """Converte um DataFrame em linhas HTML para uso interno."""
+def _df_to_html_rows(
+    df: pd.DataFrame,
+    col_labels: dict = None,
+    col_formats: dict = None
+) -> str:
+
+    if hasattr(df, "data"):
+        df = df.data
+
     cols = list(df.columns)
     labels = col_labels or {}
- 
+    formats = col_formats or {}
+
+    # HEADER
     header_cells = "".join(
         f'<th style="'
         f'padding:10px 14px;'
@@ -672,31 +666,68 @@ def _df_to_html_rows(df: pd.DataFrame, col_labels: dict = None) -> str:
         f'{labels.get(c, c)}</th>'
         for c in cols
     )
- 
+
     row_html = ""
+
     for i, (_, row) in enumerate(df.iterrows()):
         bg = "#ffffff" if i % 2 == 0 else "#FAFAF8"
         cells = ""
+
         for c in cols:
             val = row[c]
-            if isinstance(val, float):
-                if c in (col_labels or {}) and "%" in col_labels.get(c, ""):
-                    formatted = f"{val:.1f}%"
-                elif abs(val) >= 10:
-                    formatted = f"R$ {val:,.0f}"
-                else:
-                    formatted = f"{val:.2f}"
+
+            # 🎯 FORMATAÇÃO
+            if c in formats:
+                try:
+                    formatted = formats[c](val)
+                except:
+                    formatted = str(val)
             else:
-                formatted = str(val) if val is not None else "—"
- 
+                if isinstance(val, float):
+                    formatted = f"{val:.2f}"
+                elif val is None:
+                    formatted = "—"
+                else:
+                    formatted = str(val)
+
+            # 🎨 ESTILOS DINÂMICOS
+            style_extra = ""
+
+            # 🥇 destaque top 1
+            if c == "Posição":
+                if val == "🥇":
+                    style_extra += "font-weight:700;font-size:15px;"
+                elif val in ["🥈", "🥉"]:
+                    style_extra += "font-weight:600;"
+
+            # 💰 destacar faturamento alto (primeira linha geralmente)
+            if c == "Faturamento" and i == 0:
+                style_extra += "font-weight:700;color:#0A7A33;"
+
+            # 📊 destacar proporção alta
+            if c == "Proporção":
+                try:
+                    if val >= 0.5:
+                        style_extra += "font-weight:700;color:#B00020;"
+                    elif val >= 0.3:
+                        style_extra += "font-weight:600;"
+                except:
+                    pass
+
+            # 🧾 nome do produto mais importante (top 1)
+            if c == "nome_produto" and i == 0:
+                style_extra += "font-weight:600;"
+
             cells += (
                 f'<td style="'
                 f'padding:10px 14px;font-size:13px;color:#1A1A1A;'
-                f'border-bottom:1px solid rgba(26,26,26,0.05);">'
+                f'border-bottom:1px solid rgba(26,26,26,0.05);'
+                f'{style_extra}">'
                 f'{formatted}</td>'
             )
+
         row_html += f'<tr style="background:{bg};">{cells}</tr>'
- 
+
     return f"""
     <table style="width:100%;border-collapse:collapse;">
         <thead><tr>{header_cells}</tr></thead>
@@ -705,18 +736,20 @@ def _df_to_html_rows(df: pd.DataFrame, col_labels: dict = None) -> str:
     """
  
  
-def table_card(df: pd.DataFrame, col_labels: dict = None, title: str = None):
+def table_card(
+    df: pd.DataFrame,
+    col_labels: dict = None,
+    col_formats: dict = None,
+    title: str = None,
+    return_html: bool = False 
+):
     """
-    Renderiza um DataFrame como card branco com borda sutil,
-    igual ao chart_card — sem o tema escuro do st.dataframe.
- 
-    col_labels: dict mapeando nome_coluna → label exibido
-                ex: {
-                    "nome_fantasia": "Expositor",
-                    "prob_vale_a_pena_pct": "Prob. (%)",
-                    "ganho_real_medio": "Ganho Médio",
-                }
+    Renderiza um DataFrame como card estilizado OU retorna HTML.
     """
+
+    if hasattr(df, "data"):
+        df = df.data
+
     title_html = ""
     if title:
         title_html = f"""
@@ -726,15 +759,14 @@ def table_card(df: pd.DataFrame, col_labels: dict = None, title: str = None):
             margin-bottom:14px;
         ">{title}</div>
         """
- 
-    table_html = _df_to_html_rows(df, col_labels)
-    n_rows = len(df)
-    card_height = 56 + (n_rows * 42) + (44 if title else 0) + 24
- 
-    html(f"""
+
+    table_html = _df_to_html_rows(df, col_labels, col_formats)
+
+    html_block = f"""
     <div style="
         background:#ffffff;
-        border:1px solid rgba(26,26,26,0.10);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+        border:none;
         border-radius:12px;
         padding:18px 20px;
         margin-bottom:16px;
@@ -743,244 +775,13 @@ def table_card(df: pd.DataFrame, col_labels: dict = None, title: str = None):
         {title_html}
         {table_html}
     </div>
-    """, height=card_height, scrolling=False)
- 
- 
-def filter_header():
-    """Renderiza o cabeçalho da área de filtros."""
-    html("""
-    <div style="
-        background:#F2F1EE;
-        border:1px solid rgba(26,26,26,0.08);
-        border-radius:10px;
-        padding:10px 16px;
-        margin-bottom:4px;
-        display:flex;align-items:center;gap:8px;
-    ">
-        <span style="
-            font-size:10px;font-weight:600;
-            letter-spacing:1.5px;text-transform:uppercase;color:#6B6963;
-        ">Filtros</span>
-    </div>
-    """, height=44, scrolling=False)
- 
- 
-def priority_header(tipo: str):
     """
-    Cabeçalho colorido das tabelas de prioridade.
-    tipo: "risco" | "oportunidade"
-    """
-    if tipo == "risco":
-        dot_color, label, sublabel = "#E05A5A", "Maiores Riscos", "— alto ganho, baixa probabilidade"
-    else:
-        dot_color, label, sublabel = "#4CAF87", "Maiores Oportunidades", "— alta probabilidade, alto ganho"
- 
-    html(f"""
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-        <span style="
-            width:7px;height:7px;border-radius:50%;
-            background:{dot_color};display:inline-block;flex-shrink:0;
-        "></span>
-        <span style="
-            font-size:11px;font-weight:600;
-            letter-spacing:1.2px;text-transform:uppercase;color:#1A1A1A;
-        ">{label}</span>
-        <span style="font-size:10px;color:#6B6963;">{sublabel}</span>
-    </div>
-    """, height=36, scrolling=False)
 
+    if return_html:
+        return html_block
 
+    n_rows = len(df)
+    card_height = 56 + (n_rows * 42) + (44 if title else 0) + 24
 
-def simulacao_card(resultado: dict):
-    """
-    Renderiza o card de resultado da simulação.
-
-    Lógica de volume de vendas:
-      - ja_otimo=True              → exibe volume_vendas como métrica extra ao lado das demais
-      - tem_otimizacao=True        → exibe coluna "Vol. Vendas" na tabela, lida de l["volume_vendas"]
-      - nem ótimo nem otimizável   → sem alteração (comportamento original)
-    """
-    from streamlit.components.v1 import html
+    html(html_block, height=card_height, scrolling=False)
  
-    nome_fantasia  = resultado.get("nome_fantasia", "—")
-    status_atual   = resultado.get("status_atual", "—")
-    prob_atual     = resultado.get("prob_atual", 0)
-    tem_otimizacao = resultado.get("tem_otimizacao", False)
-    tem_tabela     = resultado.get("tem_tabela", False)
-    linhas         = resultado.get("linhas", [])
-    ja_otimo       = resultado.get("ja_otimo", False)
-    volume_vendas  = resultado.get("volume_vendas", 0)
-    ganho_real_medio = resultado.get("ganho_real_medio", 0)
-    receita_otimizada = resultado.get("receita_otimizada", 0)
- 
-    vale_a_pena = prob_atual >= 60
-    if vale_a_pena:
-        status_bg     = "#E8F4EE"
-        status_border = "#2E7D5C"
-        status_label  = "✅ Vale a pena"
-        status_sub    = "Os parâmetros informados são viáveis."
-    else:
-        status_bg     = "#FBEAE8"
-        status_border = "#C0392B"
-        status_label  = "❌ Não vale a pena"
-        status_sub    = "Os parâmetros informados não são viáveis. Veja os cenários otimizados abaixo."
- 
-    receita_mft = f"R$ {float(receita_otimizada):,.0f}"
-    label_receita = "Receita Otimizada"
-
-    # ── coluna extra de volume (só quando ja_otimo) ────────────────────────
-    if ja_otimo and volume_vendas:
-        volume_fmt = f"{int(volume_vendas):,}".replace(",", ".")
-        volume_col_html = f"""
-        <div style="display:flex;flex-direction:column;padding:12px 16px;min-width:120px;flex:1;
-                    border-left:1px solid rgba(26,26,26,0.07);">
-            <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#6B6963;margin-bottom:6px;">Vol. de Vendas</div>
-            <div style="font-family:'DM Serif Display',serif;font-style:italic;font-size:20px;color:#1A1A1A;line-height:1.1;">{volume_fmt}</div>
-        </div>
-        """
-    else:
-        volume_col_html = ""
-
-    # ── coluna extra de ganho real medio (só quando ja_otimo) ────────────────────────
-    if ja_otimo and ganho_real_medio:
-        ganho_fmt = f"R$ {ganho_real_medio:,.2f}".replace(",", ".")
-        ganho_col_html = f"""
-        <div style="display:flex;flex-direction:column;padding:12px 16px;min-width:120px;flex:1;
-                    border-left:1px solid rgba(26,26,26,0.07);">
-            <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#6B6963;margin-bottom:6px;">Ganho Real Médio</div>
-            <div style="font-family:'DM Serif Display',serif;font-style:italic;font-size:20px;color:#1A1A1A;line-height:1.1;">{ganho_fmt}</div>
-        </div>
-        """
-    else:
-        ganho_col_html = ""
-
-    # ── métricas do cenário atual ──────────────────────────────────────────
-    metricas_html = f"""
-    <div style="display:flex;flex-wrap:wrap;border-top:1px solid rgba(26,26,26,0.07);margin-top:14px;">
-        <div style="display:flex;flex-direction:column;padding:12px 16px;border-right:1px solid rgba(26,26,26,0.07);min-width:120px;flex:1;">
-            <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#6B6963;margin-bottom:6px;">Probabilidade Atual</div>
-            <div style="font-family:'DM Serif Display',serif;font-style:italic;font-size:20px;color:#1A1A1A;line-height:1.1;">{prob_atual:.1f}%</div>
-        </div>
-        <div style="display:flex;flex-direction:column;padding:12px 16px;border-right:1px solid rgba(26,26,26,0.07);min-width:120px;flex:1;">
-            <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#6B6963;margin-bottom:6px;">Status</div>
-            <div style="font-family:'DM Serif Display',serif;font-style:italic;font-size:20px;color:#1A1A1A;line-height:1.1;">{status_atual}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;padding:12px 16px;min-width:120px;flex:1;">
-            <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#6B6963;margin-bottom:6px;">{label_receita}</div>
-            <div style="font-family:'DM Serif Display',serif;font-style:italic;font-size:20px;color:#1A1A1A;line-height:1.1;">{receita_mft}</div>
-        </div>
-        {volume_col_html}
-        {ganho_col_html}
-    </div>
-    """
- 
-    # ── bloco de otimização ────────────────────────────────────────────────
-    if not tem_otimizacao:
-        if ja_otimo:
-            otimizacao_html = """
-            <div style="margin-top:16px;background:#E8F4EE;border:1px solid rgba(46,125,92,0.3);
-                        border-radius:10px;padding:16px 18px;text-align:center;">
-                <div style="font-size:12px;font-weight:600;color:#2E7D5C;">✨ Parâmetros já são ótimos!</div>
-                <div style="font-size:11px;color:#2E7D5C;margin-top:4px;opacity:0.8;">
-                    Não há necessidade de ajustes. Os valores atuais são ideais.
-                </div>
-            </div>
-            """
-        else:
-            otimizacao_html = """
-            <div style="margin-top:16px;background:#FBEAE8;border:1px solid rgba(192,57,43,0.25);
-                        border-radius:10px;padding:16px 18px;text-align:center;">
-                <div style="font-size:12px;font-weight:600;color:#C0392B;">
-                    ⚠️ Sem cenário viável nos parâmetros comerciais aceitos
-                </div>
-                <div style="font-size:11px;color:#C0392B;margin-top:6px;opacity:0.85;">
-                    A receita esperada deste expositor não comporta nenhuma combinação de 
-                    comissão (1%–15%) e mínimo garantido (R$5.000–R$35.000) com probabilidade 
-                    mínima de 60%. Considere não firmar contrato de comissão com este expositor.
-                </div>
-            </div>
-            """
-    else:
-        # cabeçalho da tabela — inclui coluna de volume de vendas
-        cabecalho = """
-        <div style="display:grid;grid-template-columns: 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr;
-                    gap:0;border-bottom:1px solid rgba(26,26,26,0.1);padding:8px 0;margin-bottom:4px;">
-            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#6B6963;">Prob. alvo</div>
-            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#6B6963;">Prob. real</div>
-            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#6B6963;">Comissão</div>
-            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#6B6963;">MG</div>
-            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#6B6963;">Receita empresa</div>
-            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#6B6963;">Vol. Vendas</div>
-        </div>
-        """
- 
-        linhas_html = ""
-        for l in linhas:
-            if l["recomendado"]:
-                row_bg     = "background:rgba(107,63,160,0.06);"
-                tag        = '<span style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#6B3FA0;background:rgba(107,63,160,0.12);border-radius:4px;padding:2px 6px;margin-left:6px;">recomendado</span>'
-                prob_color = "#6B3FA0"
-            else:
-                row_bg     = ""
-                tag        = ""
-                prob_color = "#1A1A1A"
-
-            vol_raw = volume_vendas
-            if vol_raw is not None:
-                vol_fmt = f"{int(vol_raw):,}".replace(",", ".")
-            else:
-                vol_fmt = "—"
- 
-            linhas_html += f"""
-            <div style="display:grid;grid-template-columns: 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr;
-                        gap:0;padding:10px 8px;border-radius:6px;{row_bg}
-                        border-bottom:1px solid rgba(26,26,26,0.05);align-items:center;">
-                <div style="font-family:'DM Serif Display',serif;font-style:italic;font-size:16px;color:{prob_color};">{l['prob_alvo']}{tag}</div>
-                <div style="font-size:13px;color:#6B6963;">{l['prob_real']}%</div>
-                <div style="font-size:13px;color:#1A1A1A;font-weight:500;">{l['comissao']}</div>
-                <div style="font-size:13px;color:#1A1A1A;font-weight:500;">{l['mg']}</div>
-                <div style="font-size:13px;color:#1A1A1A;">{l['receita_empresa']}</div>
-                <div style="font-size:13px;color:#1A1A1A;">{vol_fmt}</div>
-            </div>
-            """
- 
-        subtitulo = "Cenários por faixa de probabilidade" if tem_tabela else "Melhor cenário possível — abaixo de 60%"
- 
-        otimizacao_html = f"""
-        <div style="margin-top:16px;background:#F6F4EE;border:1px solid rgba(107,63,160,0.2);
-                    border-radius:10px;padding:14px 18px;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-                <span style="width:6px;height:6px;border-radius:50%;background:#6B3FA0;display:inline-block;flex-shrink:0;"></span>
-                <span style="font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#6B3FA0;">Cenários Otimizados</span>
-                <span style="font-size:11px;color:#6B6963;margin-left:4px;">{subtitulo}</span>
-            </div>
-            {cabecalho}
-            {linhas_html}
-        </div>
-        """
- 
-    # ── card completo ──────────────────────────────────────────────────────
-    card_html = f"""
-    <div style="background:#ffffff;border:1px solid rgba(26,26,26,0.10);
-                border-radius:12px;padding:18px 20px;margin-top:8px;">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
-            <div>
-                <div style="font-size:10px;font-weight:600;letter-spacing:1.2px;
-                            text-transform:uppercase;color:#6B6963;margin-bottom:4px;">Simulação — {nome_fantasia}</div>
-                <div style="font-size:12px;color:#6B6963;">{status_sub}</div>
-            </div>
-            <div style="background:{status_bg};border:1px solid {status_border};border-radius:20px;
-                        padding:5px 14px;font-size:12px;font-weight:600;color:{status_border};
-                        white-space:nowrap;flex-shrink:0;">{status_label}</div>
-        </div>
-        <div style="margin-top:16px;">
-            <div style="font-size:11px;font-weight:600;letter-spacing:1px;color:#6B6963;
-                        margin-bottom:8px;text-transform:uppercase;">Cenário Atual</div>
-            {metricas_html}
-        </div>
-        {otimizacao_html}
-    </div>
-    """
- 
-    altura = 280 + (len(linhas) * 48) + (80 if not tem_otimizacao else 0)
-    html(card_html, height=altura, scrolling=False)
