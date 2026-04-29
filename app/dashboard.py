@@ -5,7 +5,6 @@ import plotly.express as px
 import unicodedata
 import sys
 import os
-from html2image import Html2Image
 
 from exagerado_theme import (
     inject_theme,
