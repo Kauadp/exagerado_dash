@@ -6,6 +6,6 @@ requests
 python-dotenv
 pillow
 qrcode
-playwright
+imgkit
 sqlalchemy
 psycopg2-binary

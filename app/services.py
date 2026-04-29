@@ -4,27 +4,29 @@ import streamlit as st
 from config import DATABASE_URL
 from exagerado_theme import section_header, kpi_card, chart_card, table_card
 import requests
-from playwright.sync_api import sync_playwright
+import imgkit
+import tempfile
+import os
 
 def html_para_png(html_string, nome_arquivo="relatorio.png"):
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=["--no-sandbox"]
-        )
+    # cria arquivo temporário HTML
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as f:
+        f.write(html_string.encode("utf-8"))
+        html_path = f.name
 
-        page = browser.new_page(
-            viewport={"width": 1000, "height": 1200}
-        )
+    # opções pra simular viewport
+    options = {
+        "format": "png",
+        "width": 1000,
+        "disable-smart-width": "",
+        "encoding": "UTF-8",
+    }
 
-        page.set_content(html_string, wait_until="networkidle")
+    # gera imagem
+    imgkit.from_file(html_path, nome_arquivo, options=options)
 
-        page.screenshot(
-            path=nome_arquivo,
-            full_page=True
-        )
-
-        browser.close()
+    # limpa temporário
+    os.remove(html_path)
 
     return nome_arquivo
 
