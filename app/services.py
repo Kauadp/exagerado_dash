@@ -4,31 +4,6 @@ import streamlit as st
 from config import DATABASE_URL
 from exagerado_theme import section_header, kpi_card, chart_card, table_card
 import requests
-import imgkit
-import tempfile
-import os
-
-def html_para_png(html_string, nome_arquivo="relatorio.png"):
-    # cria arquivo temporário HTML
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as f:
-        f.write(html_string.encode("utf-8"))
-        html_path = f.name
-
-    # opções pra simular viewport
-    options = {
-        "format": "png",
-        "width": 1000,
-        "disable-smart-width": "",
-        "encoding": "UTF-8",
-    }
-
-    # gera imagem
-    imgkit.from_file(html_path, nome_arquivo, options=options)
-
-    # limpa temporário
-    os.remove(html_path)
-
-    return nome_arquivo
 
 def render_secao_loja(df_loja, nome_loja, loja_id, map_lojas):
 
@@ -230,7 +205,7 @@ def render_secao_loja(df_loja, nome_loja, loja_id, map_lojas):
     if st.button(f"📸 Gerar relatório {nome_loja}"):
 
         html = gerar_html_secao_loja(df_loja, nome_loja)
-        arquivo = html_para_png(html)
+        #arquivo = LINK ENDPOINT API EM DESENVOLVIMENTO DO BACKEND, RECEBE REQUISICAO E TIRA O PRINT
 
         st.success("Imagem gerada!")
 

@@ -6,6 +6,5 @@ requests
 python-dotenv
 pillow
 qrcode
-imgkit
 sqlalchemy
 psycopg2-binary
