@@ -1,21 +1,30 @@
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from html2image import Html2Image
 from config import DATABASE_URL
 from exagerado_theme import section_header, kpi_card, chart_card, table_card
 import requests
+from playwright.sync_api import sync_playwright
 
 def html_para_png(html_string, nome_arquivo="relatorio.png"):
-    hti = Html2Image(
-        output_path=".",
-        size=(1000, 1200)
-    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox"]
+        )
 
-    hti.screenshot(
-        html_str=html_string,
-        save_as=nome_arquivo
-    )
+        page = browser.new_page(
+            viewport={"width": 1000, "height": 1200}
+        )
+
+        page.set_content(html_string, wait_until="networkidle")
+
+        page.screenshot(
+            path=nome_arquivo,
+            full_page=True
+        )
+
+        browser.close()
 
     return nome_arquivo
 
