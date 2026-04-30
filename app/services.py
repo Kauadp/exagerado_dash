@@ -5,15 +5,13 @@ from config import DATABASE_URL
 from exagerado_theme import section_header, kpi_card, chart_card, table_card
 import requests
 
-def render_secao_loja(df_loja, nome_loja, loja_id, map_lojas):
+def render_secao_loja(df_loja, nome_loja, loja_id, map_lojas, meta_map):
 
     st.title(f"🏪 {nome_loja}")
     st.markdown("---")
 
     # ================= KPI =================
     section_header("KPI's da Loja")
-
-    col1, col2, col3 = st.columns(3)
 
     faturamento = df_loja['valor_total'].sum()
     vendas = df_loja['venda_id'].nunique()
@@ -29,29 +27,57 @@ def render_secao_loja(df_loja, nome_loja, loja_id, map_lojas):
 
     projecao = (faturamento / dias_observados) * dias_totais if dias_observados > 0 else 0
 
+    meta_loja = meta_map.get(loja_id, 0)
+
+    atingimento = faturamento / meta_loja if meta_loja else 0
+
+    atingimento_projetado = projecao / meta_loja if meta_loja else 0
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+
     with col1:
         kpi_card(
             "💰 Faturamento",
             f"R$ {faturamento:,.2f}",
-            f"Projeção: R$ {projecao:,.2f}",
+            "",
             "positive",
             "green"
         )
 
     with col2:
         kpi_card(
-            "🧾 Vendas",
-            f"{vendas}",
-            "Quantidade total",
-            "neutral"
+            "🎯 Meta",
+            f"R$ {meta_loja:,.0f}",
+            "",
+            "neutral",
+            "blue"
         )
 
     with col3:
         kpi_card(
-            "🎯 Ticket Médio",
-            f"R$ {ticket:,.2f}",
-            f"Melhor hora: {melhor_hora}h",
-            "neutral"
+            "📊 Atingimento",
+            f"{atingimento*100:.1f}%",
+            "",
+            "positive" if atingimento >= 1 else "negative",
+            "purple"
+        )
+
+    with col4:
+        kpi_card(
+            "🔮 Projeção",
+            f"R$ {projecao:,.0f}",
+            "",
+            "neutral",
+            "orange"
+        )
+
+    with col5:
+        kpi_card(
+            "🚀 Proj. vs Meta",
+            f"{atingimento_projetado*100:.1f}%",
+            "",
+            "positive" if atingimento_projetado >= 1 else "negative",
+            "green"
         )
 
     st.markdown("---")
@@ -105,6 +131,19 @@ def render_secao_loja(df_loja, nome_loja, loja_id, map_lojas):
 
     with col2:
         chart_card("Faturamento por Hora", fig_hora)
+
+    df_meta = pd.DataFrame({
+        "categoria": ["Atual", "Projeção", "Meta"],
+        "valor": [faturamento, projecao, meta_loja]
+    })
+
+    fig_meta = px.bar(df_meta, x="categoria", y="valor")
+
+    fig_meta.update_traces(
+        marker_color=["#6B3FA0", "#F59E0B", "#10B981"]
+    )
+
+    chart_card("Meta vs Real", fig_meta)
 
     st.markdown("---")
 
@@ -177,11 +216,12 @@ def render_secao_loja(df_loja, nome_loja, loja_id, map_lojas):
         else:
             return f"{i+1}º"
 
+    top_prod["Ticket Médio"] = top_prod["Faturamento"] / top_prod["Quantidade"]
     top_prod = top_prod.reset_index(drop=True)
     top_prod["Posição"] = top_prod.index.map(medalha)
 
     top_prod = top_prod[
-        ["Posição", "nome_produto", "Quantidade", "Faturamento", "Proporção"]
+        ["Posição", "nome_produto", "Quantidade", "Faturamento", "Proporção", "Ticket Médio"]
     ]
 
     table_card(
@@ -191,11 +231,13 @@ def render_secao_loja(df_loja, nome_loja, loja_id, map_lojas):
             "nome_produto": "Produto",
             "Quantidade": "Qtd",
             "Faturamento": "Faturamento",
-            "Proporção": "% Loja"
+            "Proporção": "% Loja",
+            "Ticket Médio": "Ticket Médio"
         },
         col_formats={
             "Faturamento": lambda x: f"R$ {x:,.2f}",
-            "Proporção": lambda x: f"{x*100:.1f}%"
+            "Proporção": lambda x: f"{x*100:.1f}%",
+            "Ticket Médio": lambda x: f"R$ {x:,.2f}"
         }
     )
 

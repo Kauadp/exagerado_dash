@@ -43,6 +43,10 @@ map_lojas = {
     205906072: "Loja Teste"
 }
 
+meta_map = {
+    205906072: 250000
+}
+
 # SideBar
 
 with st.sidebar:
@@ -68,164 +72,191 @@ if opcao == "Painel Geral":
     st.title("Visão Geral das Lojas")
 
     st.markdown("---")
-    
-    section_header("Kpi's Gerais")
+    section_header("📊 KPIs Gerais")
+
+    # =========================
+    # BASE DE CÁLCULO
+    # =========================
+    total_faturamento = df_completo['valor_total'].sum()
+    total_vendas = df_completo['venda_id'].nunique()
+    total_itens = df_completo['quantidade'].sum()
+
+    ticket_medio = total_faturamento / total_vendas if total_vendas else 0
+    pa = total_itens / total_vendas if total_vendas else 0
+
+    # vendas por minuto (últimos dados)
+    vendas_por_min = (
+        df_completo
+        .set_index('timestamp')
+        .groupby(pd.Grouper(freq='1min'))['venda_id']
+        .nunique()
+        .mean()
+    )
+
+    meta_total = sum(meta_map.values())
+
+    atingimento = total_faturamento / meta_total if meta_total else 0
+
+    dias_observados = df_completo["data"].nunique()
+    dias_totais = 6
+
+    projecao = (total_faturamento / dias_observados) * dias_totais if dias_observados else 0
+
+    atingimento_projetado = projecao / meta_total if meta_total else 0
+
+    # =========================
+    # KPIs PRINCIPAIS
+    # =========================
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+
+    with col1:
+        kpi_card("💰 Faturamento", f"R$ {total_faturamento:,.2f}", "", "positive", "green")
+
+    with col2:
+        kpi_card("🎯 Meta", f"R$ {meta_total:,.0f}", "", "neutral", "blue")
+
+    with col3:
+        kpi_card("📊 Atingimento", f"{atingimento*100:.1f}%", "", 
+                "positive" if atingimento >= 1 else "negative", "purple")
+
+    with col4:
+        kpi_card("🔮 Projeção", f"R$ {projecao:,.0f}", "", "neutral", "orange")
+
+    with col5:
+        kpi_card("🚀 Proj. vs Meta", f"{atingimento_projetado*100:.1f}%", "", 
+                "positive" if atingimento_projetado >= 1 else "negative", "green")
+
+    with col6:
+        kpi_card("🧾 Vendas", f"{total_vendas}", "", "neutral", "yellow")
+
+    # =========================
+    # KPIs DE AUDITORIA
+    # =========================
+    st.markdown("")
+    section_header("📊 Comportamento de Vendas")
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        melhor_dia = df_completo.groupby('data')['valor_total'].sum().idxmax()
         kpi_card(
-            "📅Melhor Dia de Vendas",
-            f"{melhor_dia.strftime('%d/%m/%Y')}",
-            f"Faturamento: R$ {df_completo.groupby('data')['valor_total'].sum().max():,.2f}",
-            "positive",
-            "green"
+            "🎯 Ticket Médio",
+            f"R$ {ticket_medio:,.2f}",
+            "",
+            "neutral",
+            "purple"
         )
 
     with col2:
-        melhor_hora = df_completo.groupby('hora')['valor_total'].sum().idxmax()
         kpi_card(
-            "⏰ Melhor Hora de Vendas",
-            f"{melhor_hora}:00 - {melhor_hora+1}:00",
-            f"Faturamento: R$ {df_completo.groupby('hora')['valor_total'].sum().max():,.2f}",
-            "positive",
-            "green"
+            "📦 P.A",
+            f"{pa:.2f}",
+            "",
+            "neutral",
+            "orange"
         )
 
     with col3:
-        dias_observados = df_completo["data"].nunique()
-        dias_totais = 6
-        total_vendas = df_completo['valor_total'].sum()
+        melhor_hora = df_completo.groupby('hora')['valor_total'].sum().idxmax()
+
         kpi_card(
-            "💰 Faturamento Total",
-            f"R$ {total_vendas:,.2f}",
-            f"Projeção de Vendas: R$ {df_completo['valor_total'].sum() / dias_observados * dias_totais:,.2f}",
+            "⏰ Pico de Vendas",
+            f"{melhor_hora}h",
+            "",
             "positive",
             "green"
         )
 
     st.markdown("---")
-   
-    st.title("Gráficos Rápidos")
+
+    # =========================
+    # GRÁFICOS
+    # =========================
+    st.title("📈 Análise Temporal")
+
     col1, col2 = st.columns(2)
 
+    # Faturamento por dia
     faturamento_dia = (
-        df_completo
-        .groupby('data')['valor_total']
+        df_completo.groupby('data')['valor_total']
         .sum()
         .reset_index()
     )
+    faturamento_dia["data_str"] = pd.to_datetime(faturamento_dia["data"]).dt.strftime("%d/%m")
 
-    faturamento_dia["data"] = pd.to_datetime(faturamento_dia["data"])
-    faturamento_dia["data_str"] = faturamento_dia["data"].dt.strftime("%d/%m")
-
-    fig_faturamento = px.line(
+    fig_dia = px.line(
         faturamento_dia,
         x='data_str',
         y='valor_total',
         markers=True
     )
+    fig_dia.update_traces(line=dict(width=3, color=COLOR_PRIMARY), marker=dict(size=6, color=COLOR_PRIMARY))
+    fig_dia.update_layout(margin=dict(l=10, r=10, t=30, b=10))
 
-    fig_faturamento.update_traces(
-        line=dict(color=COLOR_PRIMARY, width=3),
-        marker=dict(size=6)
-    )
-
-    fig_faturamento.update_layout(
-        margin=dict(l=10, r=10, t=30, b=10),
-        xaxis_title="",
-        yaxis_title="R$",
-        xaxis=dict(type='category')
-    )
-
-    ranking_lojas = (
-        df_completo
-        .groupby('id_loja')
-        .agg({
-            'valor_total': 'sum',
-            'venda_id': 'nunique'
-        })
-        .rename(columns={
-            'valor_total': 'Faturamento',
-            'venda_id': 'Vendas'
-        })
-    )
-    
-    ranking_lojas["Loja"] = ranking_lojas.index.map(map_lojas)
-    ranking_lojas = ranking_lojas.reset_index(drop=True)
-    ranking_lojas = ranking_lojas[["Loja", "Faturamento", "Vendas"]]
-    ranking_lojas['Ticket Médio'] = ranking_lojas['Faturamento'] / ranking_lojas['Vendas']
-
-    ranking_plot = ranking_lojas.copy()
-
-    fig_ranking = px.bar(
-        ranking_plot,
-        x="Loja",
-        y="Faturamento",
-        text_auto=True
-    )
-
-    fig_ranking.update_traces(
-        marker_color=COLOR_PRIMARY,
-        textposition="outside"
-    )
-
-    fig_ranking.update_layout(
-        margin=dict(l=10, r=10, t=30, b=10),
-        xaxis_title="",
-        yaxis_title="R$",
-    )
-
+    # Faturamento por hora
     faturamento_hora = (
-        df_completo
-        .groupby('hora')['valor_total']
+        df_completo.groupby('hora')['valor_total']
         .sum()
         .reset_index()
     )
+    faturamento_hora["hora_str"] = faturamento_hora["hora"].astype(str) + "h"
 
-    faturamento_hora = faturamento_hora.sort_values("hora")
-
-    faturamento_hora["hora_str"] = faturamento_hora["hora"].astype(int).astype(str) + "h"
-
-    fig_faturamento_hora = px.bar(
+    fig_hora = px.bar(
         faturamento_hora,
         x='hora_str',
         y='valor_total'
     )
-
-    fig_faturamento_hora.update_traces(
+    fig_hora.update_layout(margin=dict(l=10, r=10, t=30, b=10))
+    fig_hora.update_traces(
         marker_color=COLOR_SECONDARY
     )
 
-    fig_faturamento_hora.update_layout(
-        margin=dict(l=10, r=10, t=30, b=10),
-        xaxis_title="Hora",
-        yaxis_title="R$",
-        xaxis=dict(type='category')
-    )
-   
     with col1:
-        chart_card(
-            fig=fig_faturamento,
-            title="Faturamento por Dia"
-        )
+        chart_card(fig=fig_dia, title="Faturamento por Dia")
+
     with col2:
-        chart_card(
-            fig=fig_ranking,
-            title="Faturamento por Loja"
-        )
-    chart_card(
-        fig=fig_faturamento_hora,
-        title="Faturamento por Hora"
+        chart_card(fig=fig_hora, title="Faturamento por Hora")
+
+    # =========================
+    # CURVA ACUMULADA
+    # =========================
+    df_sorted = df_completo.sort_values("timestamp")
+    df_sorted["acumulado"] = df_sorted["valor_total"].cumsum()
+
+    fig_acum = px.line(
+        df_sorted,
+        x="timestamp",
+        y="acumulado"
     )
-   
+
+    fig_acum.update_layout(
+        margin=dict(l=10, r=10, t=30, b=10),
+        xaxis_title="Tempo",
+        yaxis_title="R$"
+    )
+    fig_acum.update_traces(
+        line=dict(color=COLOR_ACCENT, width=3)
+    )
+
+    chart_card(fig=fig_acum, title="📊 Faturamento Acumulado")
+
+    df_meta = pd.DataFrame({
+        "categoria": ["Atual", "Projeção", "Meta"],
+        "valor": [total_faturamento, projecao, meta_total]
+    })
+
+    fig_meta = px.bar(df_meta, x="categoria", y="valor")
+    fig_meta.update_traces(
+        marker_color=[COLOR_PRIMARY, COLOR_SECONDARY, COLOR_ACCENT]
+    )
+    chart_card(fig=fig_meta, title="Meta vs Real")
+
     st.markdown("---")
 
     st.title("Tabelas Detalhadas")
     
     # Ranking de Lojas (Tabela consolidada)
     st.subheader("🏆 Ranking de Lojas")
+
     ranking_lojas = (
         df_completo
         .groupby('id_loja')
@@ -237,23 +268,48 @@ if opcao == "Painel Geral":
             'valor_total': 'Faturamento',
             'venda_id': 'Vendas'
         })
+        .reset_index()
     )
-    
-    ranking_lojas["Loja"] = ranking_lojas.index.map(map_lojas)
-    ranking_lojas = ranking_lojas.reset_index(drop=True)
-    ranking_lojas = ranking_lojas[["Loja", "Faturamento", "Vendas"]]
-    ranking_lojas['Ticket Médio'] = ranking_lojas['Faturamento'] / ranking_lojas['Vendas']
 
-    dias_observados = df_completo["data"].nunique()
-    dias_totais = 6
+    # Mapear nome da loja
+    ranking_lojas["Loja"] = ranking_lojas["id_loja"].map(map_lojas)
 
-    ranking_lojas["Projeção de Faturamento"] = (
-        ranking_lojas["Faturamento"] / dias_observados
-    ) * dias_totais
+    # Mapear meta corretamente
+    ranking_lojas["Meta"] = ranking_lojas["id_loja"].map(meta_map)
 
-    ranking_lojas = ranking_lojas.sort_values(
-        "Faturamento", ascending=False
+    # Proteção contra NaN
+    ranking_lojas["Meta"] = ranking_lojas["Meta"].fillna(0)
+
+    # Ticket médio
+    ranking_lojas["Ticket Médio"] = ranking_lojas["Faturamento"] / ranking_lojas["Vendas"]
+
+    # Projeção
+    ranking_lojas["Projeção"] = np.where(
+        dias_observados > 0,
+        (ranking_lojas["Faturamento"] / dias_observados) * dias_totais,
+        0
     )
+
+    # Atingimento
+    ranking_lojas["Atingimento"] = np.where(
+        ranking_lojas["Meta"] > 0,
+        ranking_lojas["Faturamento"] / ranking_lojas["Meta"],
+        0
+    )
+
+    # Projeção vs Meta
+    ranking_lojas["Proj. vs Meta"] = np.where(
+        ranking_lojas["Meta"] > 0,
+        ranking_lojas["Projeção"] / ranking_lojas["Meta"],
+        0
+    )
+
+    # Seleção final (AGORA sim)
+    ranking_lojas = ranking_lojas[
+        ["Loja", "Faturamento", "Meta", "Atingimento", "Projeção", "Proj. vs Meta", "Vendas", "Ticket Médio"]
+    ]
+
+    ranking_lojas = ranking_lojas.sort_values("Faturamento", ascending=False)
 
     table_card(
         ranking_lojas,
@@ -261,13 +317,21 @@ if opcao == "Painel Geral":
         col_labels={
             "Loja": "Loja",
             "Faturamento": "Faturamento",
+            "Meta": "Meta",
+            "Atingimento": "% Meta",
+            "Projeção": "Projeção",
+            "Proj. vs Meta": "% Proj",
             "Vendas": "Vendas",
-            "Projeção de Faturamento": "Projeção"
+            "Ticket Médio": "Ticket"
         },
         col_formats={
-            "Faturamento": lambda x: f"R$ {x:,.2f}",
-            "Projeção de Faturamento": lambda x: f"R$ {x:,.2f}",
-            "Vendas": lambda x: f"{int(x)}"
+            "Faturamento": lambda x: f"R$ {x:,.0f}",
+            "Meta": lambda x: f"R$ {x:,.0f}",
+            "Projeção": lambda x: f"R$ {x:,.0f}",
+            "Atingimento": lambda x: f"{x*100:.1f}%",
+            "Proj. vs Meta": lambda x: f"{x*100:.1f}%",
+            "Vendas": lambda x: f"{int(x)}",
+            "Ticket Médio": lambda x: f"R$ {x:,.2f}"
         }
     )
 
@@ -385,4 +449,4 @@ else:
 
     df_loja = df_completo[df_completo["id_loja"] == loja_id]
 
-    render_secao_loja(df_loja, nome_loja, loja_id, map_lojas)
+    render_secao_loja(df_loja, nome_loja, loja_id, map_lojas, meta_map)

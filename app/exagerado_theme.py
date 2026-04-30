@@ -546,6 +546,20 @@ def chart_card(title: str, fig, height: int = 720, return_html: bool = False):
         paper_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=0, b=20, l=0, r=0),
     )
+    fig.update_layout(
+        font=dict(color="#1F2937"),
+        xaxis=dict(
+            showgrid=False,
+            zeroline=False
+        ),
+        yaxis=dict(
+            gridcolor="rgba(0,0,0,0.05)",
+            zeroline=False
+        ),
+    )
+    fig.update_traces(
+        hovertemplate="%{y:,.2f}<extra></extra>"
+    )
 
     chart_html = fig.to_html(
         full_html=False,
