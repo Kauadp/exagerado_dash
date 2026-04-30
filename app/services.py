@@ -10,6 +10,10 @@ def render_secao_loja(df_loja, nome_loja, loja_id, map_lojas, meta_map):
     st.title(f"🏪 {nome_loja}")
     st.markdown("---")
 
+    if df_loja.empty:
+        st.warning(f"⚠️ Nenhum dado encontrado para a {nome_loja}.")
+        return
+
     # ================= KPI =================
     section_header("KPI's da Loja")
 
