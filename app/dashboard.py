@@ -40,12 +40,27 @@ def load_full_event_data():
 df_completo = load_full_event_data()
 
 map_lojas = {
-    205906072: "Loja Teste"
+    205709335: "Vans",
+    205709338: "Arezzo",
+    205785185: "Off Premium",
+    206057004: "Ida",
+    205613392: "Aramis",
+    205406209: "High",
+    206057013: "Vix",
+    206057007: "Surto dos 50"
 }
 
 meta_map = {
-    205906072: 250000
+    205709335: 250000,  # Meta de vendas para a loja Vans
+    205709338: 300000,  # Meta de vendas para a loja Arezzo
+    205785185: 600000,  # Meta de vendas para a loja Off Premium
+    206057004: 400000,   # Meta de vendas para a loja Ida
+    205613392: 300000,  # Meta de vendas para a loja Aramis
+    205406209: 150000,   # Meta de vendas para a loja High
+    206057013: 150000,   # Meta de vendas para a loja Vix
+    206057007: 30000   # Meta de vendas para a loja Surto dos 50
 }
+
 
 # SideBar
 
