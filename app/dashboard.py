@@ -28,7 +28,7 @@ COLOR_ACCENT = "#10B981"    # verde
 
 inject_theme()
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=10)
 def load_full_event_data():
     query = "SELECT * FROM vendas_itens ORDER BY timestamp ASC"
     df = pd.read_sql(query, engine)
