@@ -364,9 +364,17 @@ if opcao == "Painel Geral":
         fill_value=0
     )
     vendas_dia = vendas_dia.sort_index(axis=1)
+
     vendas_dia["Total"] = vendas_dia.sum(axis=1)
+
+    linha_total = vendas_dia.sum().to_frame().T 
+    linha_total.index = ["Total Geral"]
+
     vendas_dia["Loja"] = vendas_dia.index.map(map_lojas)
     vendas_dia = vendas_dia.reset_index(drop=True)
+
+    linha_total["Loja"] = "Total"
+    vendas_dia = pd.concat([vendas_dia, linha_total], ignore_index=True)
 
     cols_datas = [c for c in vendas_dia.columns if isinstance(c, pd.Timestamp)]
 
@@ -378,6 +386,7 @@ if opcao == "Painel Geral":
         c.strftime("%d/%m") if isinstance(c, pd.Timestamp) else c
         for c in vendas_dia.columns
     ]
+
     table_card(
         vendas_dia,
         title="Vendas por Dia",
