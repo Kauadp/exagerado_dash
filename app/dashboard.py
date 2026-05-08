@@ -37,6 +37,25 @@ def load_full_event_data():
     df['hora'] = df['timestamp'].dt.hour
     return df
 
+def load_forecast_data():
+    query = """
+       WITH ultima_carga AS (
+        SELECT MAX(criado_em) as max_criado FROM previsoes_vendas
+    )
+    SELECT loja, previsao, timestamp_previsao 
+    FROM previsoes_vendas 
+    WHERE criado_em >= (SELECT max_criado FROM ultima_carga) - INTERVAL '1 minute'
+    ORDER BY timestamp_previsao ASC;
+        """
+    df = pd.read_sql(query, engine)
+    df['timestamp_previsao'] = pd.to_datetime(df['timestamp_previsao'])
+    df = df[
+        (df['timestamp_previsao'].dt.hour >= 10) & 
+        (df['timestamp_previsao'].dt.hour <= 22)
+    ].copy()
+    return df
+
+
 df_completo = load_full_event_data()
 
 map_lojas = {
@@ -70,7 +89,7 @@ with st.sidebar:
 
     st.markdown('### Lojas Auditadas')
 
-    opcoes_lojas = ["Painel Geral"] + list(map_lojas.values())
+    opcoes_lojas = ["Painel Geral", "Previsão Amanhã"] + list(map_lojas.values())
 
     opcao = st.radio(
         'Lojas',
@@ -449,6 +468,136 @@ if opcao == "Painel Geral":
             "Proporção": lambda x: f"{x*100:.1f}%"
         }
     )
+
+elif opcao == "Previsão Amanhã":
+    st.title("🔮 Previsão de Vendas para Amanhã")
+
+    st.markdown("---")
+
+    df_forecast = load_forecast_data()
+
+    # Cálculo Kpi's
+
+    ranking_lojas = (
+        df_completo
+        .groupby('id_loja')
+        .agg({
+            'valor_total': 'sum',
+            'venda_id': 'nunique'
+        })
+        .rename(columns={
+            'valor_total': 'Faturamento',
+            'venda_id': 'Vendas'
+        })
+        .reset_index()
+    )
+    ranking_lojas["Loja"] = ranking_lojas["id_loja"].map(map_lojas)
+    ranking_lojas["Ticket Médio"] = ranking_lojas["Faturamento"] / ranking_lojas["Vendas"]
+    dict_tickets = ranking_lojas.set_index('Loja')['Ticket Médio'].to_dict()
+    df_forecast_prev = df_forecast[df_forecast['loja'] != 'Fluxo'].copy()
+    df_forecast_prev['ticket_atual'] = df_forecast_prev['loja'].map(dict_tickets)
+    df_forecast_prev['faturamento_previsto'] = df_forecast_prev['previsao'] * df_forecast_prev['ticket_atual']
+    faturamento_previsao = df_forecast_prev['faturamento_previsto'].sum()
+
+    fluxo = df_forecast[df_forecast['loja'] == 'Fluxo']
+    pico_fluxo_horario = fluxo.sort_values('previsao', ascending=False).iloc[0]
+    pico_fluxo_hora = pico_fluxo_horario['timestamp_previsao'].hour
+    pico_fluxo_previsao = pico_fluxo_horario['previsao']
+
+    df_fluxo_prev = df_forecast[df_forecast['loja'] == 'Fluxo'].copy()
+    df_vendas_prev = df_forecast[df_forecast['loja'] != 'Fluxo'].copy()
+    df_vendas_total = df_vendas_prev.groupby('timestamp_previsao')['previsao'].sum().reset_index()
+    df_fluxo_prev['previsao'] = df_fluxo_prev['previsao'].clip(lower=0)
+    df_corr = pd.merge(
+        df_fluxo_prev[['timestamp_previsao', 'previsao']], 
+        df_vendas_total[['timestamp_previsao', 'previsao']], 
+        on='timestamp_previsao', 
+        suffixes=('_fluxo', '_vendas')
+    )
+    lags = {}
+    for i in range(4):
+        lags[f"{i}h"] = df_corr['previsao_fluxo'].corr(df_corr['previsao_vendas'].shift(-i))
+    delay_vencedor = max(lags, key=lags.get)
+    corr_vencedora = lags[delay_vencedor]
+    def calcular_delay_otimo(df_alinhado):
+        correlacoes = []
+        for delay in range(4): 
+            corr = df_alinhado['previsao_fluxo'].corr(df_alinhado['previsao_vendas'].shift(-delay))
+            correlacoes.append(corr if pd.notna(corr) else -1) # evita erro de argmax em NaNs      
+        return np.argmax(correlacoes)
+    janela_horas = calcular_delay_otimo(df_corr)
+    if corr_vencedora < 0.4:
+        msg_corr = "O volume de pessoas no pavilhão não converte em vendas."
+        cor_corr = "red"
+    else:
+        msg_corr = "O volume de pessoas no pavilhão é um bom indicador para prever vendas."
+        cor_corr = "green"
+    
+    # Kpi's
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        kpi_card("💰 Faturamento", f"R$ {faturamento_previsao:,.2f}", "", "positive", "green")
+
+    with col2:
+        kpi_card("⏰ Pico de Fluxo", f"{pico_fluxo_hora}h", f"Previsão: {pico_fluxo_previsao:.0f}", "neutral", "purple")
+
+    with col3:
+        kpi_card("⏳ Delay Conversão", f"{janela_horas}h", f"{msg_corr}", "neutral", cor_corr)
+
+    st.markdown("---")
+
+    st.subheader("Gráficos de Previsão")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # 1. Garante que as lojas estão separadas por cores
+        fig_prev_vendas = px.line(
+            df_vendas_prev,
+            x='timestamp_previsao',
+            y='previsao',
+            color='loja',  # A MÁGICA ESTÁ AQUI: Cria uma linha e cor por loja
+            markers=True,  # Adiciona pontos para facilitar a leitura das horas
+            template='plotly_white' # Deixa o fundo limpo
+        )
+
+        # 2. Estilização Profissional
+        fig_prev_vendas.update_layout(
+            margin=dict(l=10, r=10, t=50, b=10),
+            legend=dict(
+                orientation="h",       # Legenda horizontal
+                yanchor="bottom",
+                y=1.02,                # Posiciona em cima do gráfico
+                xanchor="right",
+                x=1,
+                title_text=''          # Remove o título "loja" da legenda
+            ),
+            hovermode="x unified",     # Mostra todos os valores ao passar o mouse na hora
+            xaxis=dict(showgrid=False),
+            yaxis=dict(title='Peças Previstas', showgrid=True, gridcolor='LightGray')
+        )
+
+        # 3. Ajuste de espessura das linhas (opcional: pode usar o COLOR_PRIMARY se filtrar só uma)
+        fig_prev_vendas.update_traces(line=dict(width=2.5))
+
+        # 4. Remove o título do eixo X que polui o visual
+        fig_prev_vendas.update_xaxes(title_text='')
+
+        chart_card(fig=fig_prev_vendas, title="Previsão de Vendas por Loja")
+    with col2:
+        fig_prev_fluxo = px.line(
+            df_fluxo_prev,
+            x='timestamp_previsao',
+            y='previsao'
+        )
+        fig_prev_fluxo.update_layout(margin=dict(l=10, r=10, t=30, b=10))
+        fig_prev_fluxo.update_traces(line=dict(width=3, color=COLOR_SECONDARY))
+        fig_prev_fluxo.update_xaxes(title_text='')
+        chart_card(fig=fig_prev_fluxo, title="Previsão de Fluxo por Hora")
+
+
 
 else:
     nome_loja = opcao
