@@ -12,7 +12,8 @@ from exagerado_theme import (
     table_card,
     section_header,
     kpi_card,
-    chart_card
+    chart_card,
+    render_tabela_planejamento
 )
 from database import engine
 from services import render_secao_loja
@@ -558,40 +559,37 @@ elif opcao == "Previsão Amanhã":
     st.markdown("---")
 
     st.subheader("Gráficos de Previsão")
+    lojas_selecionadas = st.multiselect("Filtrar Lojas", df_vendas_prev['loja'].unique(), default=df_vendas_prev['loja'].unique())
+    df_filtrado = df_vendas_prev[df_vendas_prev['loja'].isin(lojas_selecionadas)]
 
     col1, col2 = st.columns(2)
 
     with col1:
-        # 1. Garante que as lojas estão separadas por cores
         fig_prev_vendas = px.line(
-            df_vendas_prev,
+            df_filtrado,
             x='timestamp_previsao',
             y='previsao',
-            color='loja',  # A MÁGICA ESTÁ AQUI: Cria uma linha e cor por loja
-            markers=True,  # Adiciona pontos para facilitar a leitura das horas
-            template='plotly_white' # Deixa o fundo limpo
+            color='loja',  
+            markers=True, 
+            template='plotly_white'
         )
 
         # 2. Estilização Profissional
         fig_prev_vendas.update_layout(
             margin=dict(l=10, r=10, t=50, b=10),
             legend=dict(
-                orientation="h",       # Legenda horizontal
+                orientation="h",      
                 yanchor="bottom",
-                y=1.02,                # Posiciona em cima do gráfico
+                y=1.02,             
                 xanchor="right",
                 x=1,
-                title_text=''          # Remove o título "loja" da legenda
+                title_text=''        
             ),
-            hovermode="x unified",     # Mostra todos os valores ao passar o mouse na hora
+            hovermode="x unified",    
             xaxis=dict(showgrid=False),
             yaxis=dict(title='Peças Previstas', showgrid=True, gridcolor='LightGray')
         )
-
-        # 3. Ajuste de espessura das linhas (opcional: pode usar o COLOR_PRIMARY se filtrar só uma)
         fig_prev_vendas.update_traces(line=dict(width=2.5))
-
-        # 4. Remove o título do eixo X que polui o visual
         fig_prev_vendas.update_xaxes(title_text='')
 
         chart_card(fig=fig_prev_vendas, title="Previsão de Vendas por Loja")
@@ -605,6 +603,12 @@ elif opcao == "Previsão Amanhã":
         fig_prev_fluxo.update_traces(line=dict(width=3, color=COLOR_SECONDARY))
         fig_prev_fluxo.update_xaxes(title_text='')
         chart_card(fig=fig_prev_fluxo, title="Previsão de Fluxo por Hora")
+
+    st.markdown("---")
+
+    st.subheader("Tabela Resumo")
+
+    render_tabela_planejamento(df_vendas_prev, df_fluxo_prev, dict_tickets)
 
 
 

@@ -799,3 +799,52 @@ def table_card(
 
     html(html_block, height=card_height, scrolling=False)
  
+def render_tabela_planejamento(df_vendas_prev, df_fluxo_prev, dict_tickets):
+    # --- LOGICA DE DADOS ---
+    pico_fluxo_hora = df_fluxo_prev.loc[df_fluxo_prev['previsao'].idxmax(), 'timestamp_previsao']
+    resumo_lojas = []
+
+    for loja in df_vendas_prev['loja'].unique():
+        df_l = df_vendas_prev[df_vendas_prev['loja'] == loja].copy()
+        
+        total_pecas = int(df_l['previsao'].sum())
+        top_2_indices = df_l.nlargest(2, 'previsao')['timestamp_previsao']
+        top_2_picos = [ts.strftime('%H:00') for ts in top_2_indices]
+        
+        pico_principal_hora = df_l.loc[df_l['previsao'].idxmax(), 'timestamp_previsao']
+        delay_horas = int((pico_principal_hora - pico_fluxo_hora).total_seconds() / 3600)
+        
+        ticket = dict_tickets.get(loja, 0)
+        faturamento = total_pecas * ticket
+        
+        resumo_lojas.append({
+            "Loja": loja,
+            "Peças": total_pecas,
+            "Picos": " & ".join(top_2_picos),
+            "Delay": f"{delay_horas}h",
+            "Ticket": ticket,
+            "Faturamento": faturamento
+        })
+
+    df_final = pd.DataFrame(resumo_lojas).sort_values("Faturamento", ascending=False)
+
+    labels = {
+        "Peças": "Peças Previstas",
+        "Picos": "Picos de Venda",
+        "Delay": "Janela/Fluxo",
+        "Ticket": "Ticket Médio",
+        "Faturamento": "Fat. Estimado"
+    }
+
+    formats = {
+        "Ticket": lambda x: f"R$ {x:,.2f}",
+        "Faturamento": lambda x: f"R$ {x:,.2f}",
+        "Peças": lambda x: f"{x} un"
+    }
+
+    table_card(
+        df=df_final,
+        col_labels=labels,
+        col_formats=formats,
+        title="Planejamento Tático de Vendas (Próximo Ciclo)"
+    )
